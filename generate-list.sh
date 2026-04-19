@@ -9,16 +9,16 @@ for cat in "${CATEGORIES[@]}"; do
   folder="images/$cat"
   files=""
   if [ -d "$folder" ]; then
-    for f in "$folder"/*.{png,jpg,jpeg,webp,gif} 2>/dev/null; do
+    for f in "$folder"/*.png "$folder"/*.jpg "$folder"/*.jpeg "$folder"/*.webp "$folder"/*.gif; do
       [ -f "$f" ] || continue
       filename=$(basename "$f")
       files="${files}\"${filename}\", "
     done
-    files="${files%, }"  # remove trailing comma
+    files="${files%, }"  # remove trailing comma+space
   fi
 
-  # Replace the registry entry for this category in index.html
-  sed -i "s|${cat}:        \[.*\]|${cat}:        [${files}]|g" index.html
+  # Use perl for reliable replacement — handles any spacing and optional trailing comma
+  perl -i -pe "s|(\Q${cat}\E:\s*\[)[^\]]*(\],?)|\${1}${files}\${2}|g" index.html
 done
 
 echo "Done! Image list updated in index.html"
