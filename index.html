@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#ff85a1" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>I Love to Draw</title>
+  <link rel="manifest" href="manifest.json" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #fff5f8;
+      color: #333;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* HEADER */
+    header {
+      background: #ff85a1;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    header h1 {
+      font-size: 1.2rem;
+      color: white;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+    }
+
+    /* LANGUAGE SELECTOR */
+    #lang-select {
+      background: white;
+      border: none;
+      border-radius: 20px;
+      padding: 4px 10px;
+      font-size: 0.85rem;
+      color: #ff85a1;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    /* CATEGORY TABS */
+    #tabs {
+      display: flex;
+      background: #ffd6e3;
+      overflow-x: auto;
+      flex-shrink: 0;
+      scrollbar-width: none;
+    }
+
+    #tabs::-webkit-scrollbar { display: none; }
+
+    .tab-btn {
+      flex-shrink: 0;
+      padding: 10px 18px;
+      border: none;
+      background: transparent;
+      font-size: 0.9rem;
+      color: #aa5070;
+      cursor: pointer;
+      font-weight: bold;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      color: #ff85a1;
+      border-bottom: 3px solid #ff85a1;
+      background: #fff5f8;
+    }
+
+    /* IMAGE VIEWER */
+    #viewer {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      background: white;
+    }
+
+    #current-image {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      padding: 10px;
+      transition: opacity 0.3s;
+    }
+
+    #no-images-msg {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      color: #ccc;
+      text-align: center;
+      padding: 20px;
+    }
+
+    #no-images-msg .emoji { font-size: 3rem; }
+    #no-images-msg p { font-size: 1rem; }
+
+    /* NAV ARROWS */
+    .nav-arrow {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(255, 133, 161, 0.85);
+      border: none;
+      color: white;
+      font-size: 1.6rem;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+      transition: background 0.2s;
+    }
+
+    .nav-arrow:active { background: #ff85a1; }
+    #prev-btn { left: 8px; }
+    #next-btn { right: 8px; }
+
+    /* COUNTER */
+    #counter {
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255,133,161,0.7);
+      color: white;
+      font-size: 0.75rem;
+      padding: 2px 10px;
+      border-radius: 20px;
+    }
+
+    /* FOOTER */
+    footer {
+      background: #ffd6e3;
+      text-align: center;
+      padding: 6px;
+      font-size: 0.7rem;
+      color: #aa5070;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🦆 I Love to Draw</h1>
+  <select id="lang-select">
+    <option value="en">EN</option>
+    <option value="tr">TR</option>
+    <option value="de">DE</option>
+  </select>
+</header>
+
+<div id="tabs"></div>
+
+<div id="viewer">
+  <button class="nav-arrow" id="prev-btn">&#8592;</button>
+  <img id="current-image" src="" alt="drawing reference" />
+  <div id="no-images-msg">
+    <div class="emoji">🎨</div>
+    <p id="no-images-text">No images yet in this category.<br>Ask dad to add some!</p>
+  </div>
+  <button class="nav-arrow" id="next-btn">&#8594;</button>
+  <div id="counter"></div>
+</div>
+
+<footer id="footer-text">Look at the image and draw it on paper! 🖍️</footer>
+
+<script>
+  // ── TRANSLATIONS ──────────────────────────────────────────────
+  const i18n = {
+    en: {
+      title: "🦆 I Love to Draw",
+      footer: "Look at the image and draw it on paper! 🖍️",
+      noImages: "No images yet in this category.\nAsk dad to add some!",
+      categories: { body: "Body", dress: "Dress", hats: "Hats", shoes: "Shoes", accessories: "Accessories" }
+    },
+    tr: {
+      title: "🦆 Çizmeyi Seviyorum",
+      footer: "Resme bak ve kağıda çiz! 🖍️",
+      noImages: "Bu kategoride henüz resim yok.\nBabana eklemesini söyle!",
+      categories: { body: "Gövde", dress: "Elbise", hats: "Şapkalar", shoes: "Ayakkabılar", accessories: "Aksesuarlar" }
+    },
+    de: {
+      title: "🦆 Ich male gerne",
+      footer: "Schau das Bild an und male es auf Papier! 🖍️",
+      noImages: "Noch keine Bilder in dieser Kategorie.\nFrag Papa, welche hinzuzufügen!",
+      categories: { body: "Körper", dress: "Kleid", hats: "Hüte", shoes: "Schuhe", accessories: "Zubehör" }
+    }
+  };
+
+  // ── CATEGORIES & IMAGES ───────────────────────────────────────
+  // Each category maps to a folder under images/
+  // To add images: drop files into images/<category>/ and list them here
+  const imageData = {
+    body:        listImages("body"),
+    dress:       listImages("dress"),
+    hats:        listImages("hats"),
+    shoes:       listImages("shoes"),
+    accessories: listImages("accessories"),
+  };
+
+  // Lists image paths from the images/<folder>/ directory
+  // Since this is a static site, we embed the file list at build time.
+  // You can regenerate this list by running: node generate-list.js
+  // For now, files are listed manually — just add filenames here when you add images.
+  function listImages(folder) {
+    const registry = {
+      body:        [], // e.g. ["duck_base_1.png", "duck_base_2.png"]
+      dress:       [],
+      hats:        [],
+      shoes:       [],
+      accessories: []
+    };
+    return (registry[folder] || []).map(f => `images/${folder}/${f}`);
+  }
+
+  // ── STATE ─────────────────────────────────────────────────────
+  let currentCategory = "body";
+  let currentIndex = 0;
+  let currentLang = localStorage.getItem("lang") || "en";
+
+  // ── INIT ──────────────────────────────────────────────────────
+  function init() {
+    buildTabs();
+    setLang(currentLang);
+    document.getElementById("lang-select").value = currentLang;
+    showImage();
+  }
+
+  function buildTabs() {
+    const tabsEl = document.getElementById("tabs");
+    tabsEl.innerHTML = "";
+    Object.keys(imageData).forEach(cat => {
+      const btn = document.createElement("button");
+      btn.className = "tab-btn" + (cat === currentCategory ? " active" : "");
+      btn.dataset.cat = cat;
+      btn.textContent = i18n[currentLang].categories[cat];
+      btn.addEventListener("click", () => selectCategory(cat));
+      tabsEl.appendChild(btn);
+    });
+  }
+
+  function selectCategory(cat) {
+    currentCategory = cat;
+    currentIndex = 0;
+    document.querySelectorAll(".tab-btn").forEach(b => {
+      b.classList.toggle("active", b.dataset.cat === cat);
+      b.textContent = i18n[currentLang].categories[b.dataset.cat];
+    });
+    showImage();
+  }
+
+  function showImage() {
+    const images = imageData[currentCategory];
+    const img = document.getElementById("current-image");
+    const noMsg = document.getElementById("no-images-msg");
+    const counter = document.getElementById("counter");
+    const prev = document.getElementById("prev-btn");
+    const next = document.getElementById("next-btn");
+
+    if (images.length === 0) {
+      img.style.display = "none";
+      noMsg.style.display = "flex";
+      counter.textContent = "";
+      prev.style.display = "none";
+      next.style.display = "none";
+    } else {
+      img.style.display = "block";
+      noMsg.style.display = "none";
+      prev.style.display = "flex";
+      next.style.display = "flex";
+      img.style.opacity = 0;
+      img.src = images[currentIndex];
+      img.onload = () => { img.style.opacity = 1; };
+      counter.textContent = `${currentIndex + 1} / ${images.length}`;
+    }
+  }
+
+  function setLang(lang) {
+    currentLang = lang;
+    localStorage.setItem("lang", lang);
+    const t = i18n[lang];
+    document.querySelector("header h1").textContent = t.title;
+    document.getElementById("footer-text").textContent = t.footer;
+    document.getElementById("no-images-text").innerHTML = t.noImages.replace("\n", "<br>");
+    buildTabs();
+  }
+
+  // ── EVENTS ────────────────────────────────────────────────────
+  document.getElementById("prev-btn").addEventListener("click", () => {
+    const images = imageData[currentCategory];
+    if (images.length === 0) return;
+    currentIndex = (currentIndex - 1 + images.length) % images.length;
+    showImage();
+  });
+
+  document.getElementById("next-btn").addEventListener("click", () => {
+    const images = imageData[currentCategory];
+    if (images.length === 0) return;
+    currentIndex = (currentIndex + 1) % images.length;
+    showImage();
+  });
+
+  document.getElementById("lang-select").addEventListener("change", e => {
+    setLang(e.target.value);
+    showImage();
+  });
+
+  // Swipe support for mobile
+  let touchStartX = 0;
+  document.getElementById("viewer").addEventListener("touchstart", e => {
+    touchStartX = e.touches[0].clientX;
+  }, { passive: true });
+
+  document.getElementById("viewer").addEventListener("touchend", e => {
+    const diff = touchStartX - e.changedTouches[0].clientX;
+    if (Math.abs(diff) > 50) {
+      if (diff > 0) document.getElementById("next-btn").click();
+      else document.getElementById("prev-btn").click();
+    }
+  }, { passive: true });
+
+  init();
+
+  // Register service worker for offline support
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/service-worker.js");
+  }
+</script>
+
+</body>
+</html>
