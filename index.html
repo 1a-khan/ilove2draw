@@ -192,19 +192,25 @@
       title: "🦆 I Love to Draw",
       footer: "Look at the image and draw it on paper! 🖍️",
       noImages: "No images yet in this category.\nAsk dad to add some!",
-      categories: { body: "Body", dress: "Dress", hats: "Hats", shoes: "Shoes", accessories: "Accessories" }
+      loading: "Loading today's images... 🌟",
+      noInternet: "No internet connection.\nCome back online to load today's images!",
+      categories: { body: "Body", dress: "Dress", hats: "Hats", shoes: "Shoes", accessories: "Accessories", daily: "✨ Daily" }
     },
     tr: {
       title: "🦆 Çizmeyi Seviyorum",
       footer: "Resme bak ve kağıda çiz! 🖍️",
       noImages: "Bu kategoride henüz resim yok.\nBabana eklemesini söyle!",
-      categories: { body: "Gövde", dress: "Elbise", hats: "Şapkalar", shoes: "Ayakkabılar", accessories: "Aksesuarlar" }
+      loading: "Bugünün resimleri yükleniyor... 🌟",
+      noInternet: "İnternet bağlantısı yok.\nGünlük resimleri görmek için internete bağlan!",
+      categories: { body: "Gövde", dress: "Elbise", hats: "Şapkalar", shoes: "Ayakkabılar", accessories: "Aksesuarlar", daily: "✨ Günlük" }
     },
     de: {
       title: "🦆 Ich male gerne",
       footer: "Schau das Bild an und male es auf Papier! 🖍️",
       noImages: "Noch keine Bilder in dieser Kategorie.\nFrag Papa, welche hinzuzufügen!",
-      categories: { body: "Körper", dress: "Kleid", hats: "Hüte", shoes: "Schuhe", accessories: "Zubehör" }
+      loading: "Bilder von heute werden geladen... 🌟",
+      noInternet: "Keine Internetverbindung.\nKomm online, um die täglichen Bilder zu laden!",
+      categories: { body: "Körper", dress: "Kleid", hats: "Hüte", shoes: "Schuhe", accessories: "Zubehör", daily: "✨ Täglich" }
     }
   };
 
@@ -217,7 +223,63 @@
     hats:        listImages("hats"),
     shoes:       listImages("shoes"),
     accessories: listImages("accessories"),
+    daily:       [],  // filled dynamically from Pixabay
   };
+
+  // ── DAILY IMAGES (PIXABAY) ────────────────────────────────────
+  const PIXABAY_KEY = "55508048-4783b852d8298b11e453dabb4";
+  const DAILY_STORAGE_KEY = "daily_images";
+  const DAILY_DATE_KEY    = "daily_date";
+
+  // Rotating search terms — changes every day
+  const SEARCH_TERMS = [
+    "duck kawaii cute", "cartoon cat cute", "unicorn cute",
+    "butterfly cartoon", "rabbit kawaii", "princess cartoon cute",
+    "flower cute cartoon", "panda kawaii", "mermaid cute cartoon",
+    "owl cartoon cute", "fox kawaii", "elephant cartoon cute"
+  ];
+
+  function todayString() {
+    return new Date().toISOString().slice(0, 10); // "2026-04-19"
+  }
+
+  function dayOfYear() {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), 0, 0);
+    return Math.floor((now - start) / 86400000);
+  }
+
+  async function loadDailyImages() {
+    const today = todayString();
+    const cached = localStorage.getItem(DAILY_STORAGE_KEY);
+    const cachedDate = localStorage.getItem(DAILY_DATE_KEY);
+
+    // Use cached images if they are from today
+    if (cachedDate === today && cached) {
+      imageData.daily = JSON.parse(cached);
+      return;
+    }
+
+    // No cache or stale — fetch fresh from Pixabay
+    const day = dayOfYear();
+    const term = SEARCH_TERMS[day % SEARCH_TERMS.length];
+    const page = Math.floor(day / SEARCH_TERMS.length) + 1;
+    const url = `https://pixabay.com/api/?key=${PIXABAY_KEY}&q=${encodeURIComponent(term)}&image_type=illustration&safesearch=true&per_page=5&page=${page}`;
+
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      const urls = (data.hits || []).map(h => h.webformatURL);
+      imageData.daily = urls;
+      localStorage.setItem(DAILY_STORAGE_KEY, JSON.stringify(urls));
+      localStorage.setItem(DAILY_DATE_KEY, today);
+    } catch (e) {
+      // Offline or API error — check if we have any previously cached images
+      if (cached) {
+        imageData.daily = JSON.parse(cached);
+      }
+    }
+  }
 
   // Lists image paths from the images/<folder>/ directory
   // Since this is a static site, we embed the file list at build time.
@@ -240,11 +302,17 @@
   let currentLang = localStorage.getItem("lang") || "en";
 
   // ── INIT ──────────────────────────────────────────────────────
-  function init() {
+  async function init() {
+    // Show app immediately with static images
     buildTabs();
     setLang(currentLang);
     document.getElementById("lang-select").value = currentLang;
     showImage();
+
+    // Load daily images in background — rebuild tabs when ready
+    await loadDailyImages();
+    buildTabs();
+    if (currentCategory === "daily") showImage();
   }
 
   function buildTabs() {
@@ -281,6 +349,12 @@
     if (images.length === 0) {
       img.style.display = "none";
       noMsg.style.display = "flex";
+      const t = i18n[currentLang];
+      const isDaily = currentCategory === "daily";
+      const isOnline = navigator.onLine;
+      document.getElementById("no-images-text").innerHTML = isDaily
+        ? (isOnline ? t.loading : t.noInternet).replace("\n", "<br>")
+        : t.noImages.replace("\n", "<br>");
       counter.textContent = "";
       prev.style.display = "none";
       next.style.display = "none";

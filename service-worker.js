@@ -1,4 +1,4 @@
-const CACHE_NAME = "ilove2draw-v1";
+const CACHE_NAME = "ilove2draw-v3";
 
 const APP_SHELL = [
   "/",
@@ -30,7 +30,7 @@ self.addEventListener("activate", event => {
 self.addEventListener("fetch", event => {
   const url = new URL(event.request.url);
 
-  // Cache images aggressively — once loaded, always available offline
+  // Cache local images aggressively
   if (url.pathname.startsWith("/images/") || url.pathname.startsWith("/icons/")) {
     event.respondWith(
       caches.open(CACHE_NAME).then(cache =>
@@ -45,6 +45,9 @@ self.addEventListener("fetch", event => {
     );
     return;
   }
+
+  // Pixabay CDN images — let browser handle them directly, no service worker interference
+  if (url.hostname.includes("pixabay.com")) return;
 
   // App shell — cache first
   event.respondWith(
