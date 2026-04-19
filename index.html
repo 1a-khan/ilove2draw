@@ -226,22 +226,27 @@
     daily:       [],  // filled dynamically from Pixabay
   };
 
-  // ── DAILY IMAGES (PIXABAY) ────────────────────────────────────
+  // ── PIXABAY AUTO-FETCH ────────────────────────────────────────
   const PIXABAY_KEY = "55508048-4783b852d8298b11e453dabb4";
-  const DAILY_STORAGE_KEY = "daily_images";
-  const DAILY_DATE_KEY    = "daily_date";
 
-  // Rotating search terms — changes every day
-  const SEARCH_TERMS = [
-    "duck kawaii cute", "cartoon cat cute", "unicorn cute",
-    "butterfly cartoon", "rabbit kawaii", "princess cartoon cute",
-    "flower cute cartoon", "panda kawaii", "mermaid cute cartoon",
-    "owl cartoon cute", "fox kawaii", "elephant cartoon cute",
-    "cute house yellow cartoon", "yellow house drawing cute", "kawaii house"
-  ];
+  // Search term per category — changes daily using day-of-year as page offset
+  const CATEGORY_TERMS = {
+    body:        ["lalafanfan duck outline", "paper duck kawaii", "duck cartoon outline"],
+    dress:       ["cute dress kawaii cartoon", "kawaii outfit cartoon", "cute skirt cartoon"],
+    hats:        ["cute hat kawaii cartoon", "kawaii cap cartoon", "cute crown cartoon"],
+    shoes:       ["cute shoes kawaii cartoon", "kawaii boots cartoon", "cute sneakers cartoon"],
+    accessories: ["cute accessories kawaii", "kawaii bag cartoon", "cute bow cartoon"],
+    daily:       [
+      "duck kawaii cute", "cartoon cat cute", "unicorn cute",
+      "butterfly cartoon", "rabbit kawaii", "princess cartoon cute",
+      "flower cute cartoon", "panda kawaii", "mermaid cute cartoon",
+      "owl cartoon cute", "fox kawaii", "elephant cartoon cute",
+      "cute house yellow cartoon", "yellow house drawing cute", "kawaii house"
+    ]
+  };
 
   function todayString() {
-    return new Date().toISOString().slice(0, 10); // "2026-04-19"
+    return new Date().toISOString().slice(0, 10);
   }
 
   function dayOfYear() {
@@ -250,36 +255,44 @@
     return Math.floor((now - start) / 86400000);
   }
 
-  async function loadDailyImages() {
+  async function fetchCategoryImages(cat) {
     const today = todayString();
-    const cached = localStorage.getItem(DAILY_STORAGE_KEY);
-    const cachedDate = localStorage.getItem(DAILY_DATE_KEY);
+    const storageKey = `pixabay_${cat}`;
+    const dateKey    = `pixabay_${cat}_date`;
+    const cached     = localStorage.getItem(storageKey);
+    const cachedDate = localStorage.getItem(dateKey);
 
-    // Use cached images if they are from today
     if (cachedDate === today && cached) {
-      imageData.daily = JSON.parse(cached);
-      return;
+      return JSON.parse(cached);
     }
 
-    // No cache or stale — fetch fresh from Pixabay
-    const day = dayOfYear();
-    const term = SEARCH_TERMS[day % SEARCH_TERMS.length];
-    const page = Math.floor(day / SEARCH_TERMS.length) + 1;
-    const url = `https://pixabay.com/api/?key=${PIXABAY_KEY}&q=${encodeURIComponent(term)}&image_type=illustration&safesearch=true&per_page=5&page=${page}`;
+    const terms = CATEGORY_TERMS[cat];
+    const day   = dayOfYear();
+    const term  = terms[day % terms.length];
+    const page  = Math.floor(day / terms.length) + 1;
+    const count = cat === "daily" ? 5 : 3;
+    const url   = `https://pixabay.com/api/?key=${PIXABAY_KEY}&q=${encodeURIComponent(term)}&image_type=illustration&safesearch=true&per_page=${count}&page=${page}`;
 
     try {
-      const res = await fetch(url);
+      const res  = await fetch(url);
       const data = await res.json();
       const urls = (data.hits || []).map(h => h.webformatURL);
-      imageData.daily = urls;
-      localStorage.setItem(DAILY_STORAGE_KEY, JSON.stringify(urls));
-      localStorage.setItem(DAILY_DATE_KEY, today);
+      localStorage.setItem(storageKey, JSON.stringify(urls));
+      localStorage.setItem(dateKey, today);
+      return urls;
     } catch (e) {
-      // Offline or API error — check if we have any previously cached images
-      if (cached) {
-        imageData.daily = JSON.parse(cached);
-      }
+      return cached ? JSON.parse(cached) : [];
     }
+  }
+
+  async function loadAllPixabayImages() {
+    const categories = Object.keys(CATEGORY_TERMS);
+    const results = await Promise.all(categories.map(cat => fetchCategoryImages(cat)));
+    categories.forEach((cat, i) => {
+      // Pixabay images shown first, then bundled repo images as extra
+      const bundled = imageData[cat] || [];
+      imageData[cat] = [...results[i], ...bundled];
+    });
   }
 
   // Lists image paths from the images/<folder>/ directory
@@ -310,10 +323,10 @@
     document.getElementById("lang-select").value = currentLang;
     showImage();
 
-    // Load daily images in background — rebuild tabs when ready
-    await loadDailyImages();
+    // Fetch Pixabay images for all categories — rebuild when ready
+    await loadAllPixabayImages();
     buildTabs();
-    if (currentCategory === "daily") showImage();
+    showImage();
   }
 
   function buildTabs() {
