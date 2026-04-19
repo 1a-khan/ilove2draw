@@ -2,7 +2,7 @@
   "name": "I Love to Draw",
   "short_name": "Draw",
   "description": "Paper doll drawing references for Mihrimah",
-  "start_url": "/",
+  "start_url": "/ilove2draw/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#fff5f8",
