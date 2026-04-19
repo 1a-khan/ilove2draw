@@ -215,35 +215,34 @@
   };
 
   // ── CATEGORIES & IMAGES ───────────────────────────────────────
-  // Each category maps to a folder under images/
-  // To add images: drop files into images/<category>/ and list them here
   const imageData = {
-    body:        listImages("body"),
-    dress:       listImages("dress"),
-    hats:        listImages("hats"),
-    shoes:       listImages("shoes"),
-    accessories: listImages("accessories"),
-    daily:       [],  // filled dynamically from Pixabay
+    body: [], dress: [], hats: [], shoes: [], accessories: [], daily: []
   };
 
-  // ── PIXABAY AUTO-FETCH ────────────────────────────────────────
-  const PIXABAY_KEY = "55508048-4783b852d8298b11e453dabb4";
+  async function loadImageRegistry() {
+    try {
+      const res = await fetch(`images.json?t=${Date.now()}`);
+      const registry = await res.json();
+      Object.keys(registry).forEach(cat => {
+        imageData[cat] = registry[cat].map(f => `images/${cat}/${f}`);
+      });
+    } catch (e) {
+      // offline — imageData stays empty
+    }
+  }
 
-  // Search term per category — changes daily using day-of-year as page offset
-  const CATEGORY_TERMS = {
-    body:        ["lalafanfan duck outline", "paper duck kawaii", "duck cartoon outline"],
-    dress:       ["cute dress kawaii cartoon", "kawaii outfit cartoon", "cute skirt cartoon"],
-    hats:        ["cute hat kawaii cartoon", "kawaii cap cartoon", "cute crown cartoon"],
-    shoes:       ["cute shoes kawaii cartoon", "kawaii boots cartoon", "cute sneakers cartoon"],
-    accessories: ["cute accessories kawaii", "kawaii bag cartoon", "cute bow cartoon"],
-    daily:       [
-      "duck kawaii cute", "cartoon cat cute", "unicorn cute",
-      "butterfly cartoon", "rabbit kawaii", "princess cartoon cute",
-      "flower cute cartoon", "panda kawaii", "mermaid cute cartoon",
-      "owl cartoon cute", "fox kawaii", "elephant cartoon cute",
-      "cute house yellow cartoon", "yellow house drawing cute", "kawaii house"
-    ]
-  };
+  // ── PIXABAY — DAILY TAB ONLY ─────────────────────────────────
+  const PIXABAY_KEY    = "55508048-4783b852d8298b11e453dabb4";
+  const DAILY_STORAGE_KEY = "pixabay_daily";
+  const DAILY_DATE_KEY    = "pixabay_daily_date";
+
+  const DAILY_TERMS = [
+    "duck kawaii cute", "cartoon cat cute", "unicorn cute",
+    "butterfly cartoon", "rabbit kawaii", "princess cartoon cute",
+    "flower cute cartoon", "panda kawaii", "mermaid cute cartoon",
+    "owl cartoon cute", "fox kawaii", "elephant cartoon cute",
+    "cute house yellow cartoon", "yellow house drawing cute", "kawaii house"
+  ];
 
   function todayString() {
     return new Date().toISOString().slice(0, 10);
@@ -255,44 +254,31 @@
     return Math.floor((now - start) / 86400000);
   }
 
-  async function fetchCategoryImages(cat) {
-    const today = todayString();
-    const storageKey = `pixabay_${cat}`;
-    const dateKey    = `pixabay_${cat}_date`;
-    const cached     = localStorage.getItem(storageKey);
-    const cachedDate = localStorage.getItem(dateKey);
+  async function loadDailyImages() {
+    const today      = todayString();
+    const cached     = localStorage.getItem(DAILY_STORAGE_KEY);
+    const cachedDate = localStorage.getItem(DAILY_DATE_KEY);
 
     if (cachedDate === today && cached) {
-      return JSON.parse(cached);
+      imageData.daily = JSON.parse(cached);
+      return;
     }
 
-    const terms = CATEGORY_TERMS[cat];
-    const day   = dayOfYear();
-    const term  = terms[day % terms.length];
-    const page  = Math.floor(day / terms.length) + 1;
-    const count = cat === "daily" ? 5 : 3;
-    const url   = `https://pixabay.com/api/?key=${PIXABAY_KEY}&q=${encodeURIComponent(term)}&image_type=illustration&safesearch=true&per_page=${count}&page=${page}`;
+    const day  = dayOfYear();
+    const term = DAILY_TERMS[day % DAILY_TERMS.length];
+    const page = Math.floor(day / DAILY_TERMS.length) + 1;
+    const url  = `https://pixabay.com/api/?key=${PIXABAY_KEY}&q=${encodeURIComponent(term)}&image_type=illustration&safesearch=true&per_page=5&page=${page}`;
 
     try {
       const res  = await fetch(url);
       const data = await res.json();
       const urls = (data.hits || []).map(h => h.webformatURL);
-      localStorage.setItem(storageKey, JSON.stringify(urls));
-      localStorage.setItem(dateKey, today);
-      return urls;
+      imageData.daily = urls;
+      localStorage.setItem(DAILY_STORAGE_KEY, JSON.stringify(urls));
+      localStorage.setItem(DAILY_DATE_KEY, today);
     } catch (e) {
-      return cached ? JSON.parse(cached) : [];
+      if (cached) imageData.daily = JSON.parse(cached);
     }
-  }
-
-  async function loadAllPixabayImages() {
-    const categories = Object.keys(CATEGORY_TERMS);
-    const results = await Promise.all(categories.map(cat => fetchCategoryImages(cat)));
-    categories.forEach((cat, i) => {
-      // Pixabay images shown first, then bundled repo images as extra
-      const bundled = imageData[cat] || [];
-      imageData[cat] = [...results[i], ...bundled];
-    });
   }
 
   // Lists image paths from the images/<folder>/ directory
@@ -317,14 +303,12 @@
 
   // ── INIT ──────────────────────────────────────────────────────
   async function init() {
-    // Show app immediately with static images
-    buildTabs();
     setLang(currentLang);
     document.getElementById("lang-select").value = currentLang;
-    showImage();
 
-    // Fetch Pixabay images for all categories — rebuild when ready
-    await loadAllPixabayImages();
+    // Load registry and daily images in parallel
+    await Promise.all([loadImageRegistry(), loadDailyImages()]);
+
     buildTabs();
     showImage();
   }

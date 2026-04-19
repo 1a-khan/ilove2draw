@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin — I Love to Draw</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #fff5f8;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 32px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 4px 20px rgba(255,133,161,0.15);
+    }
+
+    h1 {
+      color: #ff85a1;
+      font-size: 1.4rem;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: bold;
+      color: #aa5070;
+      margin-bottom: 6px;
+      margin-top: 16px;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 10px 14px;
+      border: 2px solid #ffd6e3;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      color: #333;
+      outline: none;
+      transition: border 0.2s;
+    }
+
+    input:focus, select:focus { border-color: #ff85a1; }
+
+    #upload-btn {
+      margin-top: 24px;
+      width: 100%;
+      padding: 12px;
+      background: #ff85a1;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    #upload-btn:hover { background: #e0607a; }
+    #upload-btn:disabled { background: #ffc0d0; cursor: not-allowed; }
+
+    #status {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      text-align: center;
+      display: none;
+    }
+
+    #status.success { background: #d4edda; color: #155724; display: block; }
+    #status.error   { background: #f8d7da; color: #721c24; display: block; }
+    #status.loading { background: #fff3cd; color: #856404; display: block; }
+
+    #lock-screen {
+      text-align: center;
+    }
+
+    #lock-screen p {
+      color: #aa5070;
+      margin-bottom: 16px;
+      font-size: 1rem;
+    }
+
+    #unlock-btn {
+      margin-top: 12px;
+      width: 100%;
+      padding: 12px;
+      background: #ff85a1;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    #upload-screen { display: none; }
+
+    .preview-wrap {
+      margin-top: 12px;
+      text-align: center;
+    }
+
+    #preview-img {
+      max-width: 100%;
+      max-height: 200px;
+      border-radius: 10px;
+      border: 2px solid #ffd6e3;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h1>🦆 Add New Image</h1>
+
+  <!-- LOCK SCREEN -->
+  <div id="lock-screen">
+    <p>Enter admin password</p>
+    <input type="password" id="password-input" placeholder="Password" />
+    <label style="margin-top:16px;">GitHub Token (saved on this device)</label>
+    <input type="password" id="token-input" placeholder="github_pat_..." value="" />
+    <button id="unlock-btn" onclick="unlock()">Unlock</button>
+  </div>
+
+  <!-- UPLOAD SCREEN -->
+  <div id="upload-screen">
+    <label>Category</label>
+    <select id="category">
+      <option value="body">Body</option>
+      <option value="dress">Dress</option>
+      <option value="hats">Hats</option>
+      <option value="shoes">Shoes</option>
+      <option value="accessories">Accessories</option>
+    </select>
+
+    <label>Image file (PNG, JPG)</label>
+    <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp,image/gif" onchange="previewImage()" />
+
+    <div class="preview-wrap">
+      <img id="preview-img" alt="preview" />
+    </div>
+
+    <button id="upload-btn" onclick="uploadImage()">Upload Image</button>
+    <div id="status"></div>
+  </div>
+</div>
+
+<script>
+  const REPO   = "1a-khan/ilove2draw";
+  const BRANCH = "main";
+  const ADMIN_PASS = "Mihrimah2026";  // change this if you want
+
+  let GITHUB_TOKEN = localStorage.getItem("gh_token") || "";
+
+  // ── AUTH ──────────────────────────────────────────────────────
+  function unlock() {
+    const pass  = document.getElementById("password-input").value;
+    const token = document.getElementById("token-input").value.trim();
+
+    if (pass !== ADMIN_PASS) { alert("Wrong password"); return; }
+    if (!token) { alert("Please enter your GitHub token"); return; }
+
+    GITHUB_TOKEN = token;
+    localStorage.setItem("gh_token", token);
+    document.getElementById("lock-screen").style.display = "none";
+    document.getElementById("upload-screen").style.display = "block";
+  }
+
+  // Pre-fill token if already saved
+  if (GITHUB_TOKEN) {
+    document.getElementById("token-input").value = GITHUB_TOKEN;
+  }
+
+  document.getElementById("password-input").addEventListener("keydown", e => {
+    if (e.key === "Enter") unlock();
+  });
+
+  // ── PREVIEW ───────────────────────────────────────────────────
+  function previewImage() {
+    const file = document.getElementById("file-input").files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = document.getElementById("preview-img");
+      img.src = e.target.result;
+      img.style.display = "block";
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // ── UPLOAD ────────────────────────────────────────────────────
+  async function uploadImage() {
+    const file     = document.getElementById("file-input").files[0];
+    const category = document.getElementById("category").value;
+
+    if (!file) { showStatus("Please select an image file.", "error"); return; }
+
+    const btn = document.getElementById("upload-btn");
+    btn.disabled = true;
+    showStatus("Uploading image...", "loading");
+
+    try {
+      // 1. Read file as base64
+      const base64 = await toBase64(file);
+      const filename = sanitizeFilename(file.name);
+      const filePath = `images/${category}/${filename}`;
+
+      // 2. Upload image file to GitHub
+      await githubPut(filePath, base64, `add ${filename} to ${category}`);
+      showStatus("Image uploaded. Updating registry...", "loading");
+
+      // 3. Fetch current images.json from GitHub
+      const registryRes = await githubGet("images.json");
+      const registryJson = JSON.parse(atob(registryRes.content.replace(/\n/g, "")));
+      const sha = registryRes.sha;
+
+      // 4. Add filename to the correct category
+      if (!registryJson[category]) registryJson[category] = [];
+      if (!registryJson[category].includes(filename)) {
+        registryJson[category].push(filename);
+      }
+
+      // 5. Commit updated images.json
+      const updatedContent = btoa(unescape(encodeURIComponent(JSON.stringify(registryJson, null, 2))));
+      await githubPut("images.json", updatedContent, `register ${filename} in ${category}`, sha);
+
+      showStatus(`Done! "${filename}" added to ${category}. It will appear in the app in ~30 seconds.`, "success");
+      document.getElementById("file-input").value = "";
+      document.getElementById("preview-img").style.display = "none";
+
+    } catch (e) {
+      showStatus(`Error: ${e.message}`, "error");
+    }
+
+    btn.disabled = false;
+  }
+
+  // ── GITHUB API HELPERS ────────────────────────────────────────
+  async function githubGet(path) {
+    const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${path}?ref=${BRANCH}`, {
+      headers: { Authorization: `token ${GITHUB_TOKEN}`, Accept: "application/vnd.github.v3+json" }
+    });
+    if (!res.ok) throw new Error(`GitHub GET failed: ${res.status}`);
+    return res.json();
+  }
+
+  async function githubPut(path, contentBase64, message, sha = null) {
+    const body = { message, content: contentBase64, branch: BRANCH };
+    if (sha) body.sha = sha;
+    const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${path}`, {
+      method: "PUT",
+      headers: {
+        Authorization: `token ${GITHUB_TOKEN}`,
+        Accept: "application/vnd.github.v3+json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || `GitHub PUT failed: ${res.status}`);
+    }
+    return res.json();
+  }
+
+  // ── UTILS ─────────────────────────────────────────────────────
+  function toBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = e => resolve(e.target.result.split(",")[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function sanitizeFilename(name) {
+    return name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9.\-_]/g, "");
+  }
+
+  function showStatus(msg, type) {
+    const el = document.getElementById("status");
+    el.textContent = msg;
+    el.className = type;
+  }
+</script>
+
+</body>
+</html>

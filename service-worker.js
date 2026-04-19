@@ -1,4 +1,4 @@
-const CACHE_NAME = "ilove2draw-v4";
+const CACHE_NAME = "ilove2draw-v6";
 
 const APP_SHELL = [
   "/",
